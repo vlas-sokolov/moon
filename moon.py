@@ -1,12 +1,11 @@
 """
 Playing around with Lunar elevation data
 
-Explanation and full list data references:
+Explanation and full list of data references:
 https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
 """
 
 import os
-import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from config import DATA_DIR, TIF_FNAME, TIF_FNAME_SMALL
@@ -32,7 +31,7 @@ def load_lola_asarray():
     return imdata
 
 
-def downsample_lola(imdata, n=5, save=False): # pylint: disable=invalid-name
+def downsample_lola(imdata, n=5, save=False, **kwargs):
     """
     Downsample the image by taking every n'th grid value
 
@@ -48,10 +47,16 @@ def downsample_lola(imdata, n=5, save=False): # pylint: disable=invalid-name
     -------
     smalldata : np.ndarray
         Downsampled LOLA image data.
+
+    Other Parameters
+    ----------------
+    **kwargs
+        All other keyword arguments are passed to
+        `skimage.transform.downscale_local_mean`.
     """
 
-    # TODO: ideally should be interpolated, otherwise we're losing data!
-    smalldata = imdata[::n, ::n]
+    from skimage.transform import downscale_local_mean
+    smalldata = downscale_local_mean(imdata, factors=(n, n), **kwargs)
 
     if save:
         np.save(os.path.join(DATA_DIR, TIF_FNAME_SMALL), smalldata)
@@ -103,11 +108,12 @@ def main():
     #plt.show()
 
     import cartopy.crs as ccrs
-    plt.figure(figsize=(3, 3))
+    plt.figure(figsize=(6, 6))
 
-    ax = plt.axes(projection=ccrs.Orthographic(-45, 15))
-    ax.gridlines(color='black', linestyle='dotted')
+    ax = plt.axes(projection=ccrs.Orthographic(-85, -15))
+    ax.gridlines(color='#252525', linestyle='dotted')
     ax.imshow(imdata_small, origin="upper", extent=(-180, 180, -90, 90),
               transform=ccrs.PlateCarree())
 
+    plt.savefig("moon.png", dpi=100)
     plt.show()
