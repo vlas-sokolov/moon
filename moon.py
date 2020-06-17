@@ -7,8 +7,18 @@ https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDE
 
 import os
 import numpy as np
+import pandas as pd
+from skimage import io as skimage_io
+from skimage.transform import downscale_local_mean
 import matplotlib.pyplot as plt
-from config import DATA_DIR, TIF_FNAME, TIF_FNAME_SMALL
+import cartopy.crs as ccrs
+from cartopy import geodesic
+import shapely
+from config import DATA_DIR, TIF_FNAME, TIF_URL, TIF_FNAME_SMALL
+
+
+MOON_RADIUS = 1737100 # in meters, naturally
+MOON_FLATTENING = 0.0012 # an oblateness of our lunar model
 
 
 def load_lola_asarray():
@@ -18,13 +28,11 @@ def load_lola_asarray():
         # I haven't figured out how astrogeology folks normally load this;
         # opencv seems to fail - maybe there's a dedicated package for this
         # that preserves the metadata but I got it working with skimage already
-        from skimage import io
         impath = os.path.join(DATA_DIR, TIF_FNAME)
-        imdata = io.imread(impath)
+        imdata = skimage_io.imread(impath)
     except (FileNotFoundError, NotADirectoryError) as err:
         # auto-downloading massive TIF files on `except` is a pretty
         # bad idea, will raise an exception with a URL instead
-        from config import TIF_URL
         raise RuntimeError("Download the (warning: 8GB) image"
                            f" from {TIF_URL} first") from err
 
@@ -55,7 +63,6 @@ def downsample_lola(imdata, n=5, save=False, **kwargs):
         `skimage.transform.downscale_local_mean`.
     """
 
-    from skimage.transform import downscale_local_mean
     smalldata = downscale_local_mean(imdata, factors=(n, n), **kwargs)
 
     if save:
@@ -71,6 +78,42 @@ def load_lola_downsampled():
     imdata = np.load(impath)
 
     return imdata
+
+
+def overplot_craters():
+    """Overplot a lunar map with known crater outlines"""
+
+    imdata_small = load_lola_downsampled()
+    smalldata = downscale_local_mean(imdata_small, factors=(5, 5))
+    plt.figure(figsize=(6, 6), dpi=100)
+
+    ax = plt.axes(projection=ccrs.Robinson())
+    ax.gridlines(color='#252525', linestyle='dotted')
+    ax.imshow(smalldata, origin="upper", extent=(-180, 180, -90, 90),
+              transform=ccrs.PlateCarree())
+
+    # Reference: International Astronomical Union (IAU) Planetary Gazetteer
+    # CSV data downloaded from:  https://planetarynames.wr.usgs.gov/
+    # Check the page here for all the history behind the moon feature naming:
+    # https://the-moon.us/wiki/IAU_nomenclature
+    #iau_lunar_craters = pd.read_csv('iau_approved_craters.csv')
+    iau_lunar_craters = pd.read_csv('iau_approved_features.csv')
+    lons = iau_lunar_craters.Center_Longitude
+    lats = iau_lunar_craters.Center_Latitude
+    radii_in_meters = iau_lunar_craters.Diameter * 500 # km to m
+    moon_ellipsoid = geodesic.Geodesic(radius=MOON_RADIUS,
+                                       flattening=MOON_FLATTENING)
+
+    craters = []
+    for lon, lat, radius in zip(lons, lats, radii_in_meters):
+        crater = moon_ellipsoid.circle(lon=lon, lat=lat, radius=radius,
+                                       n_samples=15)
+        craters.append(crater)
+        geom = shapely.geometry.Polygon(crater)
+        ax.add_geometries((geom,), crs=ccrs.PlateCarree(), alpha=1.0,
+                          facecolor='none', edgecolor='red', linewidth=0.5)
+
+    plt.savefig("moon_features.png", dpi=100)
 
 
 def main():
@@ -107,7 +150,6 @@ def main():
     #plt.imshow(imdata_small)
     #plt.show()
 
-    import cartopy.crs as ccrs
     plt.figure(figsize=(6, 6))
 
     ax = plt.axes(projection=ccrs.Orthographic(-85, -15))
@@ -117,3 +159,7 @@ def main():
 
     plt.savefig("moon.png", dpi=100)
     plt.show()
+
+
+if __name__ == '__main__':
+    main()
