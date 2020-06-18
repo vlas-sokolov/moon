@@ -17,8 +17,10 @@ import shapely
 from config import DATA_DIR, TIF_FNAME, TIF_URL, TIF_FNAME_SMALL
 
 
-MOON_RADIUS = 1737100 # in meters, naturally
-MOON_FLATTENING = 0.0012 # an oblateness of our lunar model
+# Ref: https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+MOON_RADIUS = 1737100  # equatorial; in meters, naturally
+MOON_FLATTENING = 0.0012  # an oblateness [(a-b)/a] of our lunar model
+# no need to specify the semiminor axis: `proj +a=xxx +f=yyy` is sufficient
 
 
 def load_lola_asarray():
@@ -84,33 +86,41 @@ def overplot_craters():
     """Overplot a lunar map with known crater outlines"""
 
     imdata_small = load_lola_downsampled()
-    smalldata = downscale_local_mean(imdata_small, factors=(5, 5))
-    plt.figure(figsize=(6, 6), dpi=100)
+    smalldata = downscale_local_mean(imdata_small, factors=(15, 15))
 
-    ax = plt.axes(projection=ccrs.Robinson())
+    plt.figure(figsize=(10, 10), dpi=100)
+    moon_globe = ccrs.Globe(ellipse=None,  # can remove after #1588/#564
+                            semimajor_axis=MOON_RADIUS,
+                            flattening=MOON_FLATTENING)
+    moon_crs = ccrs.Robinson(globe=moon_globe)
+    moon_transform = ccrs.PlateCarree(globe=moon_globe)
+    ax = plt.axes(projection=moon_crs)
     ax.gridlines(color='#252525', linestyle='dotted')
-    ax.imshow(smalldata, origin="upper", extent=(-180, 180, -90, 90),
-              transform=ccrs.PlateCarree())
+    ax.imshow(smalldata, origin="upper", transform=moon_transform)
+    ax.set_global()
 
     # Reference: International Astronomical Union (IAU) Planetary Gazetteer
     # CSV data downloaded from:  https://planetarynames.wr.usgs.gov/
     # Check the page here for all the history behind the moon feature naming:
     # https://the-moon.us/wiki/IAU_nomenclature
-    #iau_lunar_craters = pd.read_csv('iau_approved_craters.csv')
-    iau_lunar_craters = pd.read_csv('iau_approved_features.csv')
+    iau_lunar_craters = pd.read_csv('iau_approved_craters.csv')
+    #iau_lunar_craters = pd.read_csv('iau_approved_features.csv')
     lons = iau_lunar_craters.Center_Longitude
     lats = iau_lunar_craters.Center_Latitude
-    radii_in_meters = iau_lunar_craters.Diameter * 500 # km to m
-    moon_ellipsoid = geodesic.Geodesic(radius=MOON_RADIUS,
-                                       flattening=MOON_FLATTENING)
-
+    radii_in_meters = iau_lunar_craters.Diameter * 500  # km to m
+    moon_geodesic = geodesic.Geodesic(radius=MOON_RADIUS,
+                                      flattening=MOON_FLATTENING)
     craters = []
+    crater_proj = ccrs.Geodetic(globe=moon_globe)
     for lon, lat, radius in zip(lons, lats, radii_in_meters):
-        crater = moon_ellipsoid.circle(lon=lon, lat=lat, radius=radius,
-                                       n_samples=15)
+        if not radius:
+            continue
+
+        crater = moon_geodesic.circle(lon=lon, lat=lat, radius=radius,
+                                      n_samples=15)
         craters.append(crater)
         geom = shapely.geometry.Polygon(crater)
-        ax.add_geometries((geom,), crs=ccrs.PlateCarree(), alpha=1.0,
+        ax.add_geometries((geom,), crs=crater_proj, alpha=1.0,
                           facecolor='none', edgecolor='red', linewidth=0.5)
 
     plt.savefig("moon_features.png", dpi=100)
