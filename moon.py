@@ -5,6 +5,10 @@ Explanation and full list of data references:
 https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
 """
 
+# FIXME: ... aren't the craters a bit too deep?!! The Tycho crater on a
+#        (heavily downsampled) image looks ~8km deep, but the official depth
+#        of Tycho is only 4.8 km bottom to the rim. What's going on?
+
 import os
 import numpy as np
 import pandas as pd
@@ -14,13 +18,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from cartopy import geodesic
 import shapely
-from config import DATA_DIR, TIF_FNAME, TIF_URL, TIF_FNAME_SMALL
-
-
-# Ref: https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
-MOON_RADIUS = 1737100  # equatorial; in meters, naturally
-MOON_FLATTENING = 0.0012  # an oblateness [(a-b)/a] of our lunar model
-# no need to specify the semiminor axis: `proj +a=xxx +f=yyy` is sufficient
+from config import Paths, Constants
 
 
 def load_lola_asarray():
@@ -30,13 +28,13 @@ def load_lola_asarray():
         # I haven't figured out how astrogeology folks normally load this;
         # opencv seems to fail - maybe there's a dedicated package for this
         # that preserves the metadata but I got it working with skimage already
-        impath = os.path.join(DATA_DIR, TIF_FNAME)
+        impath = os.path.join(Paths.data_dir, Paths.tif_fname)
         imdata = skimage_io.imread(impath)
     except (FileNotFoundError, NotADirectoryError) as err:
         # auto-downloading massive TIF files on `except` is a pretty
         # bad idea, will raise an exception with a URL instead
         raise RuntimeError("Download the (warning: 8GB) image"
-                           f" from {TIF_URL} first") from err
+                           f" from {Paths.tif_url} first") from err
 
     return imdata
 
@@ -68,7 +66,7 @@ def downsample_lola(imdata, n=5, save=False, **kwargs):
     smalldata = downscale_local_mean(imdata, factors=(n, n), **kwargs)
 
     if save:
-        np.save(os.path.join(DATA_DIR, TIF_FNAME_SMALL), smalldata)
+        np.save(os.path.join(Paths.data_dir, Paths.tif_fname_small), smalldata)
 
     return smalldata
 
@@ -76,7 +74,7 @@ def downsample_lola(imdata, n=5, save=False, **kwargs):
 def load_lola_downsampled():
     """Read the previously downsampled NumPy array"""
 
-    impath = os.path.join(DATA_DIR, TIF_FNAME_SMALL)
+    impath = os.path.join(Paths.data_dir, Paths.tif_fname_small)
     imdata = np.load(impath)
 
     return imdata
@@ -86,17 +84,21 @@ def overplot_craters():
     """Overplot a lunar map with known crater outlines"""
 
     imdata_small = load_lola_downsampled()
-    smalldata = downscale_local_mean(imdata_small, factors=(15, 15))
+    smalldata = downscale_local_mean(imdata_small, factors=(10, 10))
 
-    plt.figure(figsize=(10, 10), dpi=100)
     moon_globe = ccrs.Globe(ellipse=None,  # can remove after #1588/#564
-                            semimajor_axis=MOON_RADIUS,
-                            flattening=MOON_FLATTENING)
+                            semimajor_axis=Constants.moon_radius,
+                            flattening=Constants.moon_flattening)
     moon_crs = ccrs.Robinson(globe=moon_globe)
     moon_transform = ccrs.PlateCarree(globe=moon_globe)
+
+    plt.rc('text', usetex=True)
+    fig = plt.figure(figsize=(12, 6), dpi=120)
     ax = plt.axes(projection=moon_crs)
     ax.gridlines(color='#252525', linestyle='dotted')
-    ax.imshow(smalldata, origin="upper", transform=moon_transform)
+    im = ax.imshow(smalldata, origin="upper", transform=moon_transform)
+    cbar = fig.colorbar(im, orientation='vertical', shrink=0.7)
+    cbar.set_label(r'$\mathrm{LOLA~digital~elevation~model~(m)}$')
     ax.set_global()
 
     # Reference: International Astronomical Union (IAU) Planetary Gazetteer
@@ -108,8 +110,8 @@ def overplot_craters():
     lons = iau_lunar_craters.Center_Longitude
     lats = iau_lunar_craters.Center_Latitude
     radii_in_meters = iau_lunar_craters.Diameter * 500  # km to m
-    moon_geodesic = geodesic.Geodesic(radius=MOON_RADIUS,
-                                      flattening=MOON_FLATTENING)
+    moon_geodesic = geodesic.Geodesic(radius=Constants.moon_radius,
+                                      flattening=Constants.moon_flattening)
     craters = []
     crater_proj = ccrs.Geodetic(globe=moon_globe)
     for lon, lat, radius in zip(lons, lats, radii_in_meters):
@@ -120,10 +122,10 @@ def overplot_craters():
                                       n_samples=15)
         craters.append(crater)
         geom = shapely.geometry.Polygon(crater)
-        ax.add_geometries((geom,), crs=crater_proj, alpha=1.0,
-                          facecolor='none', edgecolor='red', linewidth=0.5)
+        ax.add_geometries((geom,), crs=crater_proj, alpha=0.6,
+                          facecolor='none', edgecolor='white', linewidth=0.5)
 
-    plt.savefig("moon_features.png", dpi=100)
+    plt.savefig(os.path.join(Paths.fig_dir, "lunar_craters.png"), dpi=120)
 
 
 def main():
@@ -131,7 +133,7 @@ def main():
 
     try:
         imdata_small = load_lola_downsampled()
-        moon_slice = np.load(os.path.join(DATA_DIR, "lola_slice.npy"))
+        moon_slice = np.load(os.path.join(Paths.data_dir, "lola_slice.npy"))
     except FileNotFoundError:
         # won't run on <16 GB RAM machine - look into
         # out-of-core solutions if that's ever an issue
@@ -141,7 +143,7 @@ def main():
         # .base attribute won't get released and the big array
         # will not get garbage collected!
         moon_slice = imdata_large[20000:30000, 20000:30000].copy()
-        np.save(os.path.join(DATA_DIR, "lola_slice.npy"), moon_slice)
+        np.save(os.path.join(Paths.data_dir, "lola_slice.npy"), moon_slice)
 
         # radical downsampling for performance and profit
         imdata_small = downsample_lola(imdata_large, n=5, save=True).copy()
