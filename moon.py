@@ -128,6 +128,45 @@ def overplot_craters():
     plt.savefig(os.path.join(Paths.fig_dir, "lunar_craters.png"), dpi=120)
 
 
+def tycho_mayavi(warp_scale=0.1):
+    """Plotting interactive crater DEM data with mayavi"""
+
+    from mayavi import mlab
+
+    # need these to extract the lat / lon arrays from a Tycho cutout
+    # surely there's a better way to do it (via pyproj) right?
+    range_x = np.array([42400, 43850])
+    range_y = np.array([33500, 34750])
+    shape_large = np.array([46080, 92160])
+    range_lon = range_x / shape_large[1] * 360 - 180
+    range_lat = 90 - range_y / shape_large[0] * 180
+
+    cutout_path = os.path.join(Paths.data_dir, 'tycho_crater.npy')
+    try:
+        dem_tycho = np.load(cutout_path)
+    except FileNotFoundError:
+        impath = os.path.join(Paths.data_dir, Paths.tif_fname)
+        imdata = skimage_io.imread(impath)
+        dem_tycho = imdata[slice(*range_y), slice(*range_x)]
+        np.save(cutout_path, dem_tycho)
+
+    surf = mlab.surf(range_lon, range_lat, dem_tycho,
+                     warp_scale=warp_scale, colormap='gist_earth')
+    # TODO: can set a satellite texture on it with
+    # surf.actor.actor.texture = optical_moon_image
+    mlab.title("Tycho crater")
+    mlab.colorbar(title='LOLA elevation model (m)', orientation='vertical',
+                  label_fmt='%.1f')
+    mlab.axes(xlabel='Longitude', ylabel='Latitude', zlabel='', opacity=0.5)
+    ax = mlab.axes()
+    #ax.axes.property.color = 'white'
+    #ax.axes.axis_title_text_property.color = 'white'
+    ax.axes.x_label = "Longitude"
+    ax.axes.y_label = "Latitude"
+    ax.axes.z_label = "Elevation"
+    ax.axes.label_format = ""
+
+
 def main():
     """TODO: split this out into a notebook or something"""
 
