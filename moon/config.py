@@ -7,6 +7,7 @@ class Paths:
     """Paths, folders, URLs, and that sort of thing"""
 
     data_dir = os.path.expanduser("~/Projects/moon_lander/data/")
+    table_dir = os.path.expanduser("~/Projects/moon_lander/tables/")
     fig_dir = os.path.expanduser("~/Projects/moon_lander/figures/")
 
     tif_fname = "Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif"

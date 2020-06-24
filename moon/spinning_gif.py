@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import gif
-from moon import load_lola_downsampled
-from config import Paths, Constants
+from .config import Paths, Constants
+from .moon import load_lola_downsampled
 
 
 @gif.frame

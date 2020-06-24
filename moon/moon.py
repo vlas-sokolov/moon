@@ -8,6 +8,9 @@ https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDE
 # FIXME: ... aren't the craters a bit too deep?!! The Tycho crater on a
 #        (heavily downsampled) image looks ~8km deep, but the official depth
 #        of Tycho is only 4.8 km bottom to the rim. What's going on?
+#        UPDATE: not a downsampling issue - mayavi on original shows it too
+# TODO: refactor this into modules/notebooks
+# FIXME: fix ale pylint relative-beyond-top-level false positives
 
 import os
 import numpy as np
@@ -18,7 +21,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from cartopy import geodesic
 import shapely
-from config import Paths, Constants
+from .config import Paths, Constants
 
 
 def load_lola_asarray():
@@ -105,8 +108,9 @@ def overplot_craters():
     # CSV data downloaded from:  https://planetarynames.wr.usgs.gov/
     # Check the page here for all the history behind the moon feature naming:
     # https://the-moon.us/wiki/IAU_nomenclature
-    iau_lunar_craters = pd.read_csv('iau_approved_craters.csv')
-    #iau_lunar_craters = pd.read_csv('iau_approved_features.csv')
+    iau_fname = os.path.join(Paths.table_dir, 'iau_approved_craters.csv')
+    #iau_fname = os.path.join(Paths.table_dir, 'iau_approved_features.csv')
+    iau_lunar_craters = pd.read_csv(iau_fname)
     lons = iau_lunar_craters.Center_Longitude
     lats = iau_lunar_craters.Center_Latitude
     radii_in_meters = iau_lunar_craters.Diameter * 500  # km to m
@@ -130,6 +134,17 @@ def overplot_craters():
 
 def tycho_mayavi(warp_scale=0.1):
     """Plotting interactive crater DEM data with mayavi"""
+
+    # TODO 1: use rasterio of tiff file
+    #         img = rasterio.open('Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif')
+    # TODO 2: rewrite this function to take in a crater name and some kind of
+    #         radius around the border (radius-fractional + scalar paddning),
+    #         then calculate the mapped region from lon/lat to array dimensions
+    #         Some helpful references:
+    #         https://stackoverflow.com/questions/36399374/
+    #         https://stackoverflow.com/questions/38102927/
+    #         (SCRATCH THAT JUST USE rasterio windows!)
+    # TODO 3: use georeferencing and windows to carve out a crater window
 
     from mayavi import mlab
 
