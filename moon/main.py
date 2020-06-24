@@ -9,84 +9,24 @@ https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDE
 #        (heavily downsampled) image looks ~8km deep, but the official depth
 #        of Tycho is only 4.8 km bottom to the rim. What's going on?
 #        UPDATE: not a downsampling issue - mayavi on original shows it too
-# TODO: refactor this into modules/notebooks
-# FIXME: fix ale pylint relative-beyond-top-level false positives
+# TODO: refactor this module out into modules/notebooks
 
 import os
 import numpy as np
 import pandas as pd
-from skimage import io as skimage_io
 from skimage.transform import downscale_local_mean
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from cartopy import geodesic
 import shapely
-from .config import Paths, Constants
-
-
-def load_lola_asarray():
-    """Read the TIF file as an array. Don't keep it in RAM unless needed!"""
-
-    try:
-        # I haven't figured out how astrogeology folks normally load this;
-        # opencv seems to fail - maybe there's a dedicated package for this
-        # that preserves the metadata but I got it working with skimage already
-        impath = os.path.join(Paths.data_dir, Paths.tif_fname)
-        imdata = skimage_io.imread(impath)
-    except (FileNotFoundError, NotADirectoryError) as err:
-        # auto-downloading massive TIF files on `except` is a pretty
-        # bad idea, will raise an exception with a URL instead
-        raise RuntimeError("Download the (warning: 8GB) image"
-                           f" from {Paths.tif_url} first") from err
-
-    return imdata
-
-
-def downsample_lola(imdata, n=5, save=False, **kwargs):
-    """
-    Downsample the image by taking every n'th grid value
-
-    Parameters
-    ----------
-    n : int, default: 5
-        Grid downscaling factor.
-
-    save : bool, default: False
-        Whether to save the array under DATA_DIR.
-
-    Returns
-    -------
-    smalldata : np.ndarray
-        Downsampled LOLA image data.
-
-    Other Parameters
-    ----------------
-    **kwargs
-        All other keyword arguments are passed to
-        `skimage.transform.downscale_local_mean`.
-    """
-
-    smalldata = downscale_local_mean(imdata, factors=(n, n), **kwargs)
-
-    if save:
-        np.save(os.path.join(Paths.data_dir, Paths.tif_fname_small), smalldata)
-
-    return smalldata
-
-
-def load_lola_downsampled():
-    """Read the previously downsampled NumPy array"""
-
-    impath = os.path.join(Paths.data_dir, Paths.tif_fname_small)
-    imdata = np.load(impath)
-
-    return imdata
+from moon.config import Paths, Constants
+from moon import io as mio
 
 
 def overplot_craters():
     """Overplot a lunar map with known crater outlines"""
 
-    imdata_small = load_lola_downsampled()
+    imdata_small = mio.load_lola_downsampled()
     smalldata = downscale_local_mean(imdata_small, factors=(10, 10))
 
     moon_globe = ccrs.Globe(ellipse=None,  # can remove after #1588/#564
@@ -156,14 +96,7 @@ def tycho_mayavi(warp_scale=0.1):
     range_lon = range_x / shape_large[1] * 360 - 180
     range_lat = 90 - range_y / shape_large[0] * 180
 
-    cutout_path = os.path.join(Paths.data_dir, 'tycho_crater.npy')
-    try:
-        dem_tycho = np.load(cutout_path)
-    except FileNotFoundError:
-        impath = os.path.join(Paths.data_dir, Paths.tif_fname)
-        imdata = skimage_io.imread(impath)
-        dem_tycho = imdata[slice(*range_y), slice(*range_x)]
-        np.save(cutout_path, dem_tycho)
+    dem_tycho = mio.get_tycho_cutout(range_x, range_y)
 
     surf = mlab.surf(range_lon, range_lat, dem_tycho,
                      warp_scale=warp_scale, colormap='gist_earth')
@@ -186,12 +119,12 @@ def main():
     """TODO: split this out into a notebook or something"""
 
     try:
-        imdata_small = load_lola_downsampled()
+        imdata_small = mio.load_lola_downsampled()
         moon_slice = np.load(os.path.join(Paths.data_dir, "lola_slice.npy"))
     except FileNotFoundError:
         # won't run on <16 GB RAM machine - look into
         # out-of-core solutions if that's ever an issue
-        imdata_large = load_lola_asarray()
+        imdata_large = mio.load_lola_asarray()
 
         # We need to invoke a copy on a slice - otherwise the .base
         # .base attribute won't get released and the big array
@@ -200,7 +133,7 @@ def main():
         np.save(os.path.join(Paths.data_dir, "lola_slice.npy"), moon_slice)
 
         # radical downsampling for performance and profit
-        imdata_small = downsample_lola(imdata_large, n=5, save=True).copy()
+        imdata_small = mio.downsample_lola(imdata_large, n=5, save=True).copy()
 
         # FIXME this doesn't always release memory - I may have left
         #       a reference to a big array somewhere - but where?
