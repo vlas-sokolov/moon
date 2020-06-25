@@ -67,7 +67,8 @@ def load_lola_downsampled():
     return imdata
 
 
-def get_tycho_cutout(range_x, range_y):
+def get_tycho_cutout(range_x=np.array([42400, 43850]),
+                     range_y=np.array([33500, 34750])):
     """One-time shot at saving a numpy array slice of Tycho crater"""
 
     cutout_path = os.path.join(Paths.data_dir, 'tycho_crater.npy')
