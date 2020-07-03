@@ -1,10 +1,52 @@
-"""Convenience read/write functions for Lunar elevation data"""
+"""
+Convenience read/write functions for Lunar elevation data
+
+Includes some georeferencing tricks. Some more basic ones with rasterio/proj:
+>>> xy_to_lonlat = Transformer.from_crs(crs, crs.geodetic_crs)
+>>> lonlat_to_xy = Transformer.from_crs(crs.geodetic_crs, crs)
+
+Example 1: pixel x/y to lon/lat:
+>>> lon, lat = transformer.transform(*img.xy(10, 1))
+
+Example 2: lon/lat to pixel x/y:
+>>> x, y = img.index(*lonlat_to_xy.transform(-90, 45))
+
+Example 3: find the centre of Tycho crater:
+>>> x, y = img.index(*lonlat_to_xy.transform(-11.36, -43.31))
+"""
 
 import os
 import numpy as np
-from skimage import io as skimage_io
+import rasterio  # for proper crs-grokking GeoTiff loading
+from pyproj import CRS, Transformer
+from skimage import io as skimage_io  # if we just need a numpy array out of it
 from skimage.transform import downscale_local_mean
 from moon.config import Paths
+
+# FIXME: need to re-project those cutouts on the fly - the edges on the map,
+#        e.g., `square_cutout(0, -88, 2)`, look like rings of Jupiter,
+#        and we can't wrap things around yet - so `square_cutout(0, -89, 2)`
+#        throws an exception.
+
+# Defining as a bunch of constants to avoid accidental reloading
+LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
+LOLA_CRS = CRS(LOLA_READER.crs)
+
+# Transformation shortcuts - maaaybe I should not overuse constants here
+XY_TO_LONLAT = Transformer.from_crs(LOLA_CRS, LOLA_CRS.geodetic_crs)
+LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
+
+
+def square_cutout(lon, lat, side):
+    """Extracts a numpy array for a side-degrees square centered at lon/lat"""
+
+    lower_x, lower_y = LONLAT_TO_XY.transform(lon - side, lat - side)
+    upper_x, upper_y = LONLAT_TO_XY.transform(lon + side, lat + side)
+
+    window = rasterio.windows.from_bounds(lower_x, lower_y,
+                                          upper_x, upper_y,
+                                          LOLA_READER.transform)
+    return LOLA_READER.read(window=window)[0]  # only one channel
 
 
 def load_lola_asarray():
