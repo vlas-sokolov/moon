@@ -40,13 +40,18 @@ LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
 def square_cutout(lon, lat, side):
     """Extracts a numpy array for a side-degrees square centered at lon/lat"""
 
-    lower_x, lower_y = LONLAT_TO_XY.transform(lon - side, lat - side)
-    upper_x, upper_y = LONLAT_TO_XY.transform(lon + side, lat + side)
-
-    window = rasterio.windows.from_bounds(lower_x, lower_y,
-                                          upper_x, upper_y,
-                                          LOLA_READER.transform)
+    window = rasterio.windows.from_bounds(*square_lonlat_to_xy(lon, lat, side),
+                                          transform=LOLA_READER.transform)
     return LOLA_READER.read(window=window)[0]  # only one channel
+
+
+def square_lonlat_to_xy(lon, lat, side):
+    """Converts a square of lon/lat centre and degrees size to x/y box"""
+
+    lower_x, lower_y = LONLAT_TO_XY.transform(lon - side / 2, lat - side / 2)
+    upper_x, upper_y = LONLAT_TO_XY.transform(lon + side / 2, lat + side / 2)
+
+    return lower_x, lower_y, upper_x, upper_y
 
 
 def load_lola_asarray():
