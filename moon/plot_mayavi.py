@@ -8,7 +8,7 @@ from mayavi import mlab
 from moon import io as mio
 
 
-def make_mayavi(lon=-11.36, lat=-43.31, side=5, title=None, warp_scale=0.1):
+def make_figure(lon=-11.36, lat=-43.31, side=5, title=None, warp_scale=0.1):
     """Plotting interactive crater DEM data with mayavi"""
 
     range_lon = lon - side / 2, lon + side / 2
@@ -37,4 +37,4 @@ def make_mayavi(lon=-11.36, lat=-43.31, side=5, title=None, warp_scale=0.1):
 
 
 if __name__ == '__main__':
-    make_mayavi()
+    make_figure(lon=-11.36, lat=-43.31, side=5, title="Tycho crater")

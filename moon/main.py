@@ -20,6 +20,7 @@ from cartopy import geodesic
 import shapely
 from moon.config import Paths, Constants
 from moon import io as mio
+from moon.plot_mayavi import make_figure as make_mayavi_figure
 
 
 def overplot_craters():
@@ -118,3 +119,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    make_mayavi_figure(lon=-11.36, lat=-43.31, side=5, title="Tycho crater")
