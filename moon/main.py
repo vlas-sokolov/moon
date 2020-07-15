@@ -119,4 +119,11 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    # Tycho crater - you can see the drawbacks of not reprojecting
+    # at 43.31°S already - it should be circular
     make_mayavi_figure(lon=-11.36, lat=-43.31, side=5, title="Tycho crater")
+
+    # Retavius crater and its rille - Rimae Petavius
+    make_mayavi_figure(60, -25, 10, warp_scale=0.3,
+                       title="Petavius, crater & rille")
