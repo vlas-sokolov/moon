@@ -16,6 +16,7 @@ Example 3: find the centre of Tycho crater:
 """
 
 import os
+from functools import wraps
 import numpy as np
 import rasterio  # for proper crs-grokking GeoTiff loading
 from pyproj import CRS, Transformer
@@ -36,7 +37,28 @@ LOLA_CRS = CRS(LOLA_READER.crs)
 XY_TO_LONLAT = Transformer.from_crs(LOLA_CRS, LOLA_CRS.geodetic_crs)
 LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
 
+# NOTE: a bit of a gotcha - the pixel values are *not* elevation! *gasp*
+# Turns out that LOLA DEM have a scaling factor:
+# height = (pixel_value * scaling_factor)
+# And actual surface height (local radius) formula is:
+# local_radius = (pixel_value * scaling_factor) + 1737400 meters
+# Reference:
+# https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
+# ... I wonder why they went with the 0.5 factor to begin with?
+SCALING_FACTOR = 0.5
 
+
+def apply_scaling_factor(image_loader):
+    """Applies a scaling factor to a return array of the decorated function"""
+
+    @wraps(image_loader)
+    def scaler_wrapper(*args, **kwargs):
+        return SCALING_FACTOR * image_loader(*args, **kwargs)
+
+    return scaler_wrapper
+
+
+@apply_scaling_factor
 def square_cutout(lon, lat, side):
     """Extracts a numpy array for a side-degrees square centered at lon/lat"""
 
@@ -105,6 +127,7 @@ def downsample_lola(imdata, n=5, save=False, **kwargs):
     return smalldata
 
 
+@apply_scaling_factor
 def load_lola_downsampled():
     """Read the previously downsampled NumPy array"""
 
@@ -114,6 +137,7 @@ def load_lola_downsampled():
     return imdata
 
 
+@apply_scaling_factor
 def get_tycho_cutout(range_x=np.array([42400, 43850]),
                      range_y=np.array([33500, 34750])):
     """One-time shot at saving a numpy array slice of Tycho crater"""

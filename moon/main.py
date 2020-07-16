@@ -5,11 +5,6 @@ Explanation and full list of data references:
 https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
 """
 
-# FIXME: ... aren't the craters a bit too deep?!! The Tycho crater on a
-#        (heavily downsampled) image looks ~8km deep, but the official depth
-#        of Tycho is only 4.8 km bottom to the rim. What's going on?
-#        UPDATE: not a downsampling issue - mayavi on original shows it too
-
 import os
 import numpy as np
 import pandas as pd
@@ -125,5 +120,5 @@ if __name__ == '__main__':
     make_mayavi_figure(lon=-11.36, lat=-43.31, side=5, title="Tycho crater")
 
     # Retavius crater and its rille - Rimae Petavius
-    make_mayavi_figure(60, -25, 10, warp_scale=0.3,
+    make_mayavi_figure(60, -25, 10, warp_scale=0.6,
                        title="Petavius, crater & rille")
