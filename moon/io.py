@@ -18,16 +18,12 @@ Example 3: find the centre of Tycho crater:
 import os
 from functools import wraps
 import numpy as np
+import gdal
 import rasterio  # for proper crs-grokking GeoTiff loading
 from pyproj import CRS, Transformer
 from skimage import io as skimage_io  # if we just need a numpy array out of it
 from skimage.transform import downscale_local_mean
 from moon.config import Paths
-
-# FIXME: need to re-project those cutouts on the fly - the edges on the map,
-#        e.g., `square_cutout(0, -88, 2)`, look like rings of Jupiter,
-#        and we can't wrap things around yet - so `square_cutout(0, -89, 2)`
-#        throws an exception.
 
 # Defining as a bunch of constants to avoid accidental reloading
 LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
@@ -62,6 +58,9 @@ def apply_scaling_factor(image_loader):
 def square_cutout(lon, lat, side):
     """Extracts a numpy array for a side-degrees square centered at lon/lat"""
 
+    # FIXME: rewrite rasterio.warp! As a workaround, use the GDAL-based
+    #        read_warped_window function to get rid of projection errors
+
     window = rasterio.windows.from_bounds(*square_lonlat_to_xy(lon, lat, side),
                                           transform=LOLA_READER.transform)
     return LOLA_READER.read(window=window)[0]  # only one channel
@@ -76,14 +75,42 @@ def square_lonlat_to_xy(lon, lat, side):
     return lower_x, lower_y, upper_x, upper_y
 
 
+@apply_scaling_factor
+def read_warped_window(lon, lat, side, width_correction=True,
+                       source=os.path.join(Paths.data_dir, Paths.tif_fname)):
+    """The GDAL way, although ideally I should rewrite this in rasterio.warp"""
+
+    try:
+        side_lat, side_lon = side
+    except TypeError:
+        side_lat, side_lon = side, side
+
+    # Apply a rough correction on the width (~1/cos(lat) for equirectangular)
+    if width_correction:
+        side_lon /= np.cos(lat / 180 * np.pi)
+
+    lat_min, lat_max = lat - side_lat / 2, lat + side_lat / 2
+    lon_min, lon_max = lon - side_lon / 2, lon + side_lon / 2
+
+    cut = gdal.Warp('', source,
+                    format='MEM', resampleAlg=gdal.GRA_CubicSpline,
+                    multithread=True,
+                    outputBounds=(lon_min, lat_min, lon_max, lat_max),
+                    outputBoundsSRS="+proj=longlat +no_defs",
+                    srcSRS="+proj=eqc +R=1737400",
+                    dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
+                           " +R=1737400 +no_defs")
+
+    return cut.ReadAsArray()
+
+
 def load_lola_asarray():
     """Read the TIF file as an array. Don't keep it in RAM unless needed!"""
 
     try:
-        # I haven't figured out how astrogeology folks normally load this;
-        # my best guess is rasterio for lazy loading and header parsing?
-        # opencv seems to fail - maybe there's a dedicated package for this
-        # that preserves the metadata but I got it working with skimage already
+        # It seems that GDAL (or something on top of it like rasterio) is a
+        # clear winner in loading the .tif image. The following below is sort
+        # of a legacy code I used for downsampling the image.
         impath = os.path.join(Paths.data_dir, Paths.tif_fname)
         imdata = skimage_io.imread(impath)
     except (FileNotFoundError, NotADirectoryError) as err:
