@@ -14,9 +14,11 @@ def make_figure(lon=-11.36, lat=-43.31, side=5, title=None, warp_scale=0.2):
     range_lon = lon - side / 2, lon + side / 2
     range_lat = lat - side / 2, lat + side / 2
 
-    dem_tycho = mio.square_cutout(lon, lat, side)
+    # TODO: add reprojection to rasterio-based tiff handling
+    #dem_arr = mio.square_cutout(lon, lat, side)
+    dem_arr = mio.read_warped_window(lon, lat, side)
 
-    surf = mlab.surf(range_lat, range_lon, dem_tycho,
+    surf = mlab.surf(range_lat, range_lon, dem_arr,
                      warp_scale=warp_scale, colormap='gist_earth')
     # TODO: can set a satellite texture on it with
     # surf.actor.actor.texture = optical_moon_image
@@ -37,4 +39,4 @@ def make_figure(lon=-11.36, lat=-43.31, side=5, title=None, warp_scale=0.2):
 
 
 if __name__ == '__main__':
-    make_figure(lon=-11.36, lat=-43.31, side=5, title="Tycho crater")
+    make_figure(lon=-11.36, lat=-43.31, side=4, title="Tycho crater")
