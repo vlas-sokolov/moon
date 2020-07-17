@@ -23,7 +23,7 @@ import rasterio  # for proper crs-grokking GeoTiff loading
 from pyproj import CRS, Transformer
 from skimage import io as skimage_io  # if we just need a numpy array out of it
 from skimage.transform import downscale_local_mean
-from moon.config import Paths
+from moon.config import Paths, Constants
 
 # Defining as a bunch of constants to avoid accidental reloading
 LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
@@ -33,24 +33,14 @@ LOLA_CRS = CRS(LOLA_READER.crs)
 XY_TO_LONLAT = Transformer.from_crs(LOLA_CRS, LOLA_CRS.geodetic_crs)
 LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
 
-# NOTE: a bit of a gotcha - the pixel values are *not* elevation! *gasp*
-# Turns out that LOLA DEM have a scaling factor:
-# height = (pixel_value * scaling_factor)
-# And actual surface height (local radius) formula is:
-# local_radius = (pixel_value * scaling_factor) + 1737400 meters
-# Reference:
-# https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
-# ... I wonder why they went with the 0.5 factor to begin with?
-SCALING_FACTOR = 0.5
-
 
 def apply_scaling_factor(image_loader):
     """Applies a scaling factor to a return array of the decorated function"""
 
     @wraps(image_loader)
     def scaler_wrapper(*args, **kwargs):
-        return SCALING_FACTOR * image_loader(*args, **kwargs)
-
+        return Constants.local_radius(image_loader(*args, **kwargs),
+                                      absolute=False)
     return scaler_wrapper
 
 
@@ -97,9 +87,9 @@ def read_warped_window(lon, lat, side, width_correction=True,
                     multithread=True,
                     outputBounds=(lon_min, lat_min, lon_max, lat_max),
                     outputBoundsSRS="+proj=longlat +no_defs",
-                    srcSRS="+proj=eqc +R=1737400",
+                    srcSRS=f"+proj=eqc +R={Constants.lola_dem_moon_radius}",
                     dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
-                           " +R=1737400 +no_defs")
+                           f" +R={Constants.lola_dem_moon_radius} +no_defs")
 
     return cut.ReadAsArray()
 

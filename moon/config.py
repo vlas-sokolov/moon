@@ -29,5 +29,27 @@ class Constants:
     moon_flattening = 0.0012  # an oblateness [(a - b) / a] of the lunar model
 
     # absolute reference point for LOLA digital elevation model
-    # TODO: they seem to have used a spherical model?
-    moon_ref_radius = 1737400
+    # they seem to use a spherical model, not an oblate spheroid above
+    lola_dem_moon_radius = 1737400
+    lola_dem_scaling_factor = 0.5
+
+    @classmethod
+    def local_radius(cls, pixel_value, absolute=False):
+        """Converts pixel value to local radius"""
+
+        # NOTE: this a bit of a gotcha - the pixel values are *not* elevation!
+        # Turns out that LOLA DEM have a scaling factor:
+        # height = (pixel_value * scaling_factor)
+        # And actual surface height (local radius) formula is:
+        # local_radius = (pixel_value * scaling_factor) + 1737400 meters
+        # Reference:
+        # https://astrogeology.usgs.gov/search/map/Moon/LRO/ \
+        #       LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
+        # ... I wonder why they went with the 0.5 factor to begin with?
+
+        elevation = pixel_value * cls.lola_dem_scaling_factor
+
+        if absolute:
+            return elevation + cls.lola_dem_moon_radius
+
+        return elevation
