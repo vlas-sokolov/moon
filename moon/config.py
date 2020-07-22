@@ -1,6 +1,7 @@
 """Because yaml is an overkill for a few string constants"""
 
 import os
+import numpy as np
 
 
 class Paths:
@@ -12,6 +13,13 @@ class Paths:
 
     tif_fname = "Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif"
     tif_fname_small = "Lunar_LRO_LOLA_Downsampled.npy"
+
+    # Reference: International Astronomical Union (IAU) Planetary Gazetteer
+    # CSV data downloaded from:  https://planetarynames.wr.usgs.gov/
+    # Check the page here for all the history behind the moon feature naming:
+    # https://the-moon.us/wiki/IAU_nomenclature
+    iau_craters_fname = "iau_approved_craters.csv"
+    iau_features_fname = "iau_approved_features.csv"
 
     tif_url = ("http://planetarymaps.usgs.gov/mosaic/"
                "Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif")
@@ -53,3 +61,10 @@ class Constants:
             return elevation + cls.lola_dem_moon_radius
 
         return elevation
+
+    @classmethod
+    def km_to_deg(cls, dist):
+        """Returns corresponding degree for a given arc length of a circle"""
+
+        # conversions: meters to km; rad to deg
+        return dist / cls.lola_dem_moon_radius * 1000 / np.pi * 180

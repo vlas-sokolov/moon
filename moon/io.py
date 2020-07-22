@@ -1,5 +1,5 @@
 """
-Convenience read/write functions for Lunar elevation data
+Image operations and convenience read/write functions for Lunar elevation data
 
 Includes some georeferencing tricks. Some more basic ones with rasterio/proj:
 >>> xy_to_lonlat = Transformer.from_crs(crs, crs.geodetic_crs)
@@ -24,6 +24,7 @@ from pyproj import CRS, Transformer
 from skimage import io as skimage_io  # if we just need a numpy array out of it
 from skimage.transform import downscale_local_mean
 from moon.config import Paths, Constants
+from moon.features import LunarFeatures
 
 # Defining as a bunch of constants to avoid accidental reloading
 LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
@@ -45,12 +46,14 @@ def apply_scaling_factor(image_loader):
 
 
 @apply_scaling_factor
-def square_cutout(lon, lat, side):
-    """Extracts a numpy array for a side-degrees square centered at lon/lat"""
+def square_cutout(lon, lat, side, convert_km_to_deg=False):
+    """Extracts a numpy array for a given square centered at lon/lat"""
+
+    if convert_km_to_deg:
+        side = Constants.km_to_deg(side)
 
     # FIXME: rewrite rasterio.warp! As a workaround, use the GDAL-based
     #        read_warped_window function to get rid of projection errors
-
     window = rasterio.windows.from_bounds(*square_lonlat_to_xy(lon, lat, side),
                                           transform=LOLA_READER.transform)
     return LOLA_READER.read(window=window)[0]  # only one channel
@@ -66,7 +69,8 @@ def square_lonlat_to_xy(lon, lat, side):
 
 
 @apply_scaling_factor
-def read_warped_window(lon, lat, side, width_correction=True,
+def read_warped_window(lon, lat, side,  # side can be either in deg or km
+                       width_correction=True, convert_km_to_deg=False,
                        source=os.path.join(Paths.data_dir, Paths.tif_fname)):
     """The GDAL way, although ideally I should rewrite this in rasterio.warp"""
 
@@ -74,6 +78,10 @@ def read_warped_window(lon, lat, side, width_correction=True,
         side_lat, side_lon = side
     except TypeError:
         side_lat, side_lon = side, side
+
+    if convert_km_to_deg:
+        side_lat = Constants.km_to_deg(side_lat)
+        side_lon = Constants.km_to_deg(side_lon)
 
     # Apply a rough correction on the width (~1/cos(lat) for equirectangular)
     if width_correction:
@@ -92,6 +100,16 @@ def read_warped_window(lon, lat, side, width_correction=True,
                            f" +R={Constants.lola_dem_moon_radius} +no_defs")
 
     return cut.ReadAsArray()
+
+
+def crater_cutout(crater_name, pad=1.3, **kwargs):
+    """Returns warped elevation model around a known crater"""
+
+    lunar_features = LunarFeatures()  # ~100 ns to init, not an issue
+    lat, lon, diameter = lunar_features.crater_position_size(crater_name)
+
+    return read_warped_window(lon, lat, diameter*pad, convert_km_to_deg=True,
+                              **kwargs)
 
 
 def load_lola_asarray():
