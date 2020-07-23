@@ -26,22 +26,33 @@ from skimage.transform import downscale_local_mean
 from moon.config import Paths, Constants
 from moon.features import LunarFeatures
 
-# Defining as a bunch of constants to avoid accidental reloading
+# defining as a bunch of constants to avoid accidental reloading
 LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
 LOLA_CRS = CRS(LOLA_READER.crs)
 
-# Transformation shortcuts - maaaybe I should not overuse constants here
+# transformation shortcuts - maaaybe I should not overuse constants here
 XY_TO_LONLAT = Transformer.from_crs(LOLA_CRS, LOLA_CRS.geodetic_crs)
 LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
 
 
+# TODO: the scaling factor is nice and all but it changes int8 into float64,
+#       leading to increased data file size. If the goal is to make small
+#       GeoTiff cutouts to be sent over the network, then the scaling factor
+#       should *absolutely* be applied on the client side!
 def apply_scaling_factor(image_loader):
     """Applies a scaling factor to a return array of the decorated function"""
 
     @wraps(image_loader)
     def scaler_wrapper(*args, **kwargs):
-        return Constants.local_radius(image_loader(*args, **kwargs),
-                                      absolute=False)
+        image = image_loader(*args, **kwargs)
+
+        # not everything is scalable! case in point - read_warped_window will
+        # return None if we choose to write into a file and not load into MEM
+        # numpy won't let us check if an array is None via bool()
+        if not isinstance(image, np.ndarray) and not image:
+            return image
+
+        return Constants.local_radius(image, absolute=False)
     return scaler_wrapper
 
 
@@ -52,7 +63,7 @@ def square_cutout(lon, lat, side, convert_km_to_deg=False):
     if convert_km_to_deg:
         side = Constants.km_to_deg(side)
 
-    # FIXME: rewrite rasterio.warp! As a workaround, use the GDAL-based
+    # FIXME: rewrite with rasterio.warp! As a workaround, use the GDAL-based
     #        read_warped_window function to get rid of projection errors
     window = rasterio.windows.from_bounds(*square_lonlat_to_xy(lon, lat, side),
                                           transform=LOLA_READER.transform)
@@ -71,8 +82,13 @@ def square_lonlat_to_xy(lon, lat, side):
 @apply_scaling_factor
 def read_warped_window(lon, lat, side,  # side can be either in deg or km
                        width_correction=True, convert_km_to_deg=False,
-                       source=os.path.join(Paths.data_dir, Paths.tif_fname)):
+                       source=os.path.join(Paths.data_dir, Paths.tif_fname),
+                       **kwargs):
     """The GDAL way, although ideally I should rewrite this in rasterio.warp"""
+
+    # might not be the most sensible way of setting defaults but hey it works
+    out_format = kwargs.pop("format", "MEM")
+    destination = kwargs.pop("destNameOrDestDS", "")
 
     try:
         side_lat, side_lon = side
@@ -83,21 +99,25 @@ def read_warped_window(lon, lat, side,  # side can be either in deg or km
         side_lat = Constants.km_to_deg(side_lat)
         side_lon = Constants.km_to_deg(side_lon)
 
-    # Apply a rough correction on the width (~1/cos(lat) for equirectangular)
+    # apply a rough correction on the width (~1/cos(lat) for equirectangular)
     if width_correction:
         side_lon /= np.cos(lat / 180 * np.pi)
 
     lat_min, lat_max = lat - side_lat / 2, lat + side_lat / 2
     lon_min, lon_max = lon - side_lon / 2, lon + side_lon / 2
 
-    cut = gdal.Warp('', source,
-                    format='MEM', resampleAlg=gdal.GRA_CubicSpline,
+    cut = gdal.Warp(destNameOrDestDS=destination, srcDSOrSrcDSTab=source,
+                    format=out_format, resampleAlg=gdal.GRA_CubicSpline,
                     multithread=True,
                     outputBounds=(lon_min, lat_min, lon_max, lat_max),
                     outputBoundsSRS="+proj=longlat +no_defs",
                     srcSRS=f"+proj=eqc +R={Constants.lola_dem_moon_radius}",
                     dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
-                           f" +R={Constants.lola_dem_moon_radius} +no_defs")
+                           f" +R={Constants.lola_dem_moon_radius} +no_defs",
+                    **kwargs)
+
+    if not cut:
+        return cut
 
     return cut.ReadAsArray()
 
@@ -116,7 +136,7 @@ def load_lola_asarray():
     """Read the TIF file as an array. Don't keep it in RAM unless needed!"""
 
     try:
-        # It seems that GDAL (or something on top of it like rasterio) is a
+        # it seems that GDAL (or something on top of it like rasterio) is a
         # clear winner in loading the .tif image. The following below is sort
         # of a legacy code I used for downsampling the image.
         impath = os.path.join(Paths.data_dir, Paths.tif_fname)

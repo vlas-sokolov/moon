@@ -53,7 +53,9 @@ class Constants:
         # Reference:
         # https://astrogeology.usgs.gov/search/map/Moon/LRO/ \
         #       LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
-        # ... I wonder why they went with the 0.5 factor to begin with?
+        # Q: Why did they go with the 0.5 factor to begin with?
+        # A: To make the files smaller? You can reduce the abs. error on DEM if
+        #    your scaling factor is a float - DEM can be an 8-bit integer then
 
         elevation = pixel_value * cls.lola_dem_scaling_factor
 
