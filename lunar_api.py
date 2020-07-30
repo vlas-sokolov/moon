@@ -12,7 +12,7 @@ def logo():
     """Reprojects LOLA DEM around a requested crater and returns back a .tif"""
 
     crater_name = request.args.get('name')
-    fname = path.join('webcache', crater_name.replace(' ', '_'))
+    fname = path.join('webcache', crater_name.replace(' ', '_') + '.tif')
 
     if not path.isfile(fname):
         mio.crater_cutout(crater_name, destNameOrDestDS=fname, format="GTIFF")
