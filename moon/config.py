@@ -27,7 +27,7 @@ class Paths:
 
 class Constants:
     """
-    Geometrical definition for Lunar reference ellipsoid
+    Geometrical definition for lunar reference ellipsoid
 
     Ref: https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
     """

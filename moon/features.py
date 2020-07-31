@@ -36,7 +36,7 @@ class Crater(dict):
 
 
 class LunarFeatures:
-    """Helper class assisting in finding Lunar features"""
+    """Helper class assisting in finding lunar features"""
 
     # Keeping as class attribute?
     # Pros: gets executed at import time

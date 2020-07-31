@@ -1,5 +1,5 @@
 """
-Image operations and convenience read/write functions for Lunar elevation data
+Image operations and convenience read/write functions for lunar elevation data
 
 Includes some georeferencing tricks. Some more basic ones with rasterio/proj:
 >>> xy_to_lonlat = Transformer.from_crs(crs, crs.geodetic_crs)

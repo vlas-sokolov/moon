@@ -1,4 +1,4 @@
-"""Dummy webserver doing handouts of Lunar elevation squares"""
+"""Dummy webserver doing handouts of lunar elevation squares"""
 
 from os import path
 from flask import Flask

@@ -1,5 +1,5 @@
 """
-Playing around with Lunar elevation data
+Playing around with lunar elevation data
 
 Explanation and full list of data references:
 https://astrogeology.usgs.gov/search/map/Moon/LRO/LOLA/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014
