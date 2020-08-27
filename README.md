@@ -4,21 +4,23 @@ A small Python package aimed at extracting cutouts of lunar craters from a large
 
 ### What can it do?
 
-For example, it can make a cutout around the Tycho crater and warp it to get rid of projection errors  (i.e. craters are circles, not ellipses), saving it into a .tif file:
+It provides a few convenience scripts for processing the LOLA dataset. For example, it can make a cutout around the Tycho crater and warp it to get rid of projection errors  (i.e. craters are generally circles, not ellipses), saving it into a .tif file:
 
 ```python
 from moon import io as mio
 
 mio.crater_cutout('tycho', destNameOrDestDS="tycho.tif", format="GTIFF")
 ```
+A (rudimentary) simple `flask` API is provided, serving the `.tif` cutouts:
 
-Or a `flask` server can be started, serving the `.tif` cutouts via a (rudimentary) simple API:
+- On server side: `export FLASK_APP=lunar_api.py; python -m flask run`
+- On client side: `curl http://127.0.0.1:5000/craters\?name=tycho --output tycho.tif`
 
-On server side: `export FLASK_APP=lunar_api.py; python -m flask run`
+### What can I do with the .tif cutouts?
 
-On client side: `curl http://127.0.0.1:5000/craters\?name=tycho --output tycho.tif`
+Example #1: inject them in interactive visualizations ([click here](https://vlas.dev/html/crater-viewer) for a demo).
 
-Open and plot the elevation with `rasterio`:
+Example #2: open and plot the elevation with `rasterio`:
 
 ```python
 import rasterio
