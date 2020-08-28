@@ -21,8 +21,6 @@ import numpy as np
 import gdal
 import rasterio  # for proper crs-grokking GeoTiff loading
 from pyproj import CRS, Transformer
-from skimage import io as skimage_io  # if we just need a numpy array out of it
-from skimage.transform import downscale_local_mean
 from moon.config import Paths, Constants
 from moon.features import LunarFeatures
 
@@ -139,6 +137,7 @@ def load_lola_asarray():
         # it seems that GDAL (or something on top of it like rasterio) is a
         # clear winner in loading the .tif image. The following below is sort
         # of a legacy code I used for downsampling the image.
+        from skimage import io as skimage_io
         impath = os.path.join(Paths.data_dir, Paths.tif_fname)
         imdata = skimage_io.imread(impath)
     except (FileNotFoundError, NotADirectoryError) as err:
@@ -174,6 +173,7 @@ def downsample_lola(imdata, n=5, save=False, **kwargs):
         `skimage.transform.downscale_local_mean`.
     """
 
+    from skimage.transform import downscale_local_mean
     smalldata = downscale_local_mean(imdata, factors=(n, n), **kwargs)
 
     if save:
@@ -201,6 +201,7 @@ def get_tycho_cutout(range_x=np.array([42400, 43850]),
     try:
         dem_tycho = np.load(cutout_path)
     except FileNotFoundError:
+        from skimage import io as skimage_io
         impath = os.path.join(Paths.data_dir, Paths.tif_fname)
         imdata = skimage_io.imread(impath)
         dem_tycho = imdata[slice(*range_y), slice(*range_x)]
