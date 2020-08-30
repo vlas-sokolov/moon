@@ -2,14 +2,21 @@
 
 import os
 import numpy as np
+import moon
+
+
+def _parent_dir_abspath(folder):
+    """A shortcut to access folders one level beyond top-level package"""
+
+    return os.path.join(os.path.dirname(moon.__file__), '..', folder)
 
 
 class Paths:
     """Paths, folders, URLs, and that sort of thing"""
 
-    data_dir = os.path.expanduser("~/Projects/moon_lander/data/")
-    table_dir = os.path.expanduser("~/Projects/moon_lander/tables/")
-    fig_dir = os.path.expanduser("~/Projects/moon_lander/figures/")
+    data_dir = _parent_dir_abspath("data")
+    table_dir = _parent_dir_abspath("tables")
+    fig_dir = _parent_dir_abspath("figures")
 
     tif_fname = "Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif"
     tif_fname_small = "Lunar_LRO_LOLA_Downsampled.npy"
@@ -23,6 +30,7 @@ class Paths:
 
     tif_url = ("http://planetarymaps.usgs.gov/mosaic/"
                "Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif")
+    s3_url = "s3://lola-global-dem/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif"
 
 
 class Constants:

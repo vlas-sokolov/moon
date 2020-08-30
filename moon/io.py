@@ -25,7 +25,12 @@ from moon.config import Paths, Constants
 from moon.features import LunarFeatures
 
 # defining as a bunch of constants to avoid accidental reloading
-LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
+try:
+    LOLA_READER = rasterio.open(os.path.join(Paths.data_dir, Paths.tif_fname))
+except rasterio.errors.RasterioIOError:
+    # If the file isn't in the data dir, try reading from the S3 bucket instead
+    LOLA_READER = rasterio.open(Paths.s3_url)
+
 LOLA_CRS = CRS(LOLA_READER.crs)
 
 # transformation shortcuts - maaaybe I should not overuse constants here
