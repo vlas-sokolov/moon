@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import gif
 from moon.config import Paths, Constants
-from moon.main import load_lola_downsampled
+from moon.io import load_lola_downsampled
 
 
 @gif.frame

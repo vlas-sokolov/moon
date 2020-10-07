@@ -7,6 +7,7 @@ from moon import io as mio
 
 app = Flask(__name__)
 
+
 @app.route('/craters', methods=['GET'])
 def logo():
     """Reprojects LOLA DEM around a requested crater and returns back a .tif"""
