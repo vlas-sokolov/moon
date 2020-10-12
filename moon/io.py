@@ -109,14 +109,17 @@ def read_warped_window(lon, lat, side,  # side can be either in deg or km
     lat_min, lat_max = lat - side_lat / 2, lat + side_lat / 2
     lon_min, lon_max = lon - side_lon / 2, lon + side_lon / 2
 
+    lunar_r = Constants.lola_dem_moon_radius
+
+    # added "+R=..." to outputBoundsSRS/te_srs to avoid errors in GDAL v3.x.x
     cut = gdal.Warp(destNameOrDestDS=destination, srcDSOrSrcDSTab=source,
                     format=out_format, resampleAlg=gdal.GRA_CubicSpline,
                     multithread=True,
                     outputBounds=(lon_min, lat_min, lon_max, lat_max),
-                    outputBoundsSRS="+proj=longlat +no_defs",
-                    srcSRS=f"+proj=eqc +R={Constants.lola_dem_moon_radius}",
+                    outputBoundsSRS=f"+proj=longlat +R={lunar_r} +no_defs",
+                    srcSRS=f"+proj=eqc +R={lunar_r}",
                     dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
-                           f" +R={Constants.lola_dem_moon_radius} +no_defs",
+                           f" +R={lunar_r} +no_defs",
                     **kwargs)
 
     if not cut:
