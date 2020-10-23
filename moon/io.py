@@ -38,6 +38,10 @@ XY_TO_LONLAT = Transformer.from_crs(LOLA_CRS, LOLA_CRS.geodetic_crs)
 LONLAT_TO_XY = Transformer.from_crs(LOLA_CRS.geodetic_crs, LOLA_CRS)
 
 
+def _lonlat_to_xy_transform(lon, lat, lunar_r):
+    return Transformer.from_crs(CRS(f"+proj=longlat +R={lunar_r} +lat_0={lat}"
+                                    f" +lon_0={lon} +no_defs"), LOLA_CRS)
+
 # TODO: the scaling factor is nice and all but it changes int8 into float64,
 #       leading to increased data file size. If the goal is to make small
 #       GeoTiff cutouts to be sent over the network, then the scaling factor
@@ -111,16 +115,37 @@ def read_warped_window(lon, lat, side,  # side can be either in deg or km
 
     lunar_r = Constants.lola_dem_moon_radius
 
+    # TODO: figure out how to transform the bounds first?
+    # what is +nodefs then?
+    dst_crs = CRS({"proj": "ortho", "lat_0": lat, "lon_0": lon, "R": lunar_r})
+    cutout_bounds = [*LONLAT_TO_XY.transform(lon_min, lat_min),
+                     *LONLAT_TO_XY.transform(lon_max, lat_max)]
+    src_bounds_crs = CRS({"proj": "longlat", "R": lunar_r})
+    src_crs = CRS({"proj": "eqc", "R": lunar_r})
+
     # added "+R=..." to outputBoundsSRS/te_srs to avoid errors in GDAL v3.x.x
-    cut = gdal.Warp(destNameOrDestDS=destination, srcDSOrSrcDSTab=source,
-                    format=out_format, resampleAlg=gdal.GRA_CubicSpline,
-                    multithread=True,
-                    outputBounds=(lon_min, lat_min, lon_max, lat_max),
-                    outputBoundsSRS=f"+proj=longlat +R={lunar_r} +no_defs",
-                    srcSRS=f"+proj=eqc +R={lunar_r}",
-                    dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
-                           f" +R={lunar_r} +no_defs",
-                    **kwargs)
+    # cut = gdal.Warp(destNameOrDestDS=destination, srcDSOrSrcDSTab=source,
+    #                 format=out_format, resampleAlg=gdal.GRA_CubicSpline,
+    #                 multithread=True,
+    #                 outputBounds=(lon_min, lat_min, lon_max, lat_max),
+    #                 outputBoundsSRS=f"+proj=longlat +R={lunar_r} +no_defs",
+    #                 srcSRS=f"+proj=eqc +R={lunar_r}",
+    #                 dstSRS=f"+proj=ortho +lat_0={lat} +lon_0={lon}"
+    #                        f" +R={lunar_r} +no_defs",
+    #                 **kwargs)
+    from rasterio.warp import calculate_default_transform
+    transform, _, _ = calculate_default_transform(
+            src_crs, src_bounds_crs,
+            source.width, source.height,
+            *cutout_bounds)  # FIXME this is nonsense!
+
+    cut = rasterio.warp.reproject(
+        source=source,
+        destination=destination,
+        src_crs=src_crs,
+        dst_transform=transform,
+        dst_crs=dst_crs,
+        resampling=rasterio.warp.Resampling.cubic)
 
     if not cut:
         return cut
